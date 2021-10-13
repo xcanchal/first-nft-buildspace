@@ -3,7 +3,7 @@
 import './styles/App.css';
 import twitterLogo from './assets/twitter-logo.svg';
 import { ethers } from "ethers";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import myEpicNft from './utils/MyEpicNFT.json';
 
 const TWITTER_HANDLE = 'xcanchal';
@@ -18,7 +18,7 @@ const App = () => {
     const [mintingStats, setMintingStats] = useState({});
     const [minting, setMinting] = useState(false);
     const [wrongChain, setWrongChain] = useState(false);
-
+    
     const checkIfWalletIsConnected = async () => {
       const { ethereum } = window;
 
@@ -28,7 +28,7 @@ const App = () => {
       } else {
           console.log("We have the ethereum object", ethereum);
       }
-
+    
       setWrongChain(false);
       let chainId = await ethereum.request({ method: 'eth_chainId' });
       console.log("Connected to chain " + chainId);
@@ -37,12 +37,12 @@ const App = () => {
         alert("You are not connected to the Rinkeby Test Network!");
         setWrongChain(true);
       } else {
-      const accounts = await ethereum.request({ method: 'eth_accounts' });
+      const accounts = await ethereum.request({ method: 'eth_accounts' }); 
         if (accounts.length !== 0) {
             const account = accounts[0];
             console.log("Found an authorized account:", account);
             setCurrentAccount(account)
-
+            
             // Setup listener! This is for the case where a user comes to our site
             // and ALREADY had their wallet connected + authorized.
             setupEventListener()
@@ -68,7 +68,7 @@ const App = () => {
 
       // Setup listener! This is for the case where a user comes to our site
       // and connected their wallet for the first time.
-      setupEventListener()
+      setupEventListener() 
     } catch (error) {
       console.log(error)
     }
@@ -120,7 +120,7 @@ const App = () => {
         console.log("Mining...please wait.")
         await nftTxn.wait();
         setMinting(false);
-
+        
         await updateMintingStats();
         console.log(nftTxn);
         console.log(`Mined, see transaction: https://rinkeby.etherscan.io/tx/${nftTxn.hash}`);
@@ -136,7 +136,7 @@ const App = () => {
     }
   }
 
-  const getMintingStats = async () => {
+  const updateMintingStats = async () => {
     try {
       const { ethereum } = window;
 
@@ -150,7 +150,7 @@ const App = () => {
         const maxNfts = await contract.maxNfts();
         console.log('maxNfts', maxNfts);
 
-        return { current: totalMinted.toNumber(), total: maxNfts };
+        setMintingStats({ current: totalMinted.toNumber(), total: maxNfts });
       } else {
         console.log("Ethereum object doesn't exist!");
       }
@@ -160,12 +160,36 @@ const App = () => {
   }
 
   useEffect(() => {
-    checkIfWalletIsConnected();
+    checkIfWalletIsConnected(); 
   }, [])
 
-  const updateMintingStats = async () => {
-    const mintingStats = await getMintingStats();
-    setMintingStats(mintingStats);
+  const renderButton = () => {
+    let className="cta-button connect-wallet-button";
+    let text = "Connect To Wallet";
+    let action = connectWallet;
+
+    if (wrongChain) {
+      return (
+        <>
+          <button className={`${className} disabled`}>
+            {text}
+          </button>
+          <p>This dapp only works in the Rinkeby test Network. Please, change it and reload the page.</p>
+        </>
+      );
+    }
+
+    if (currentAccount !== "") {
+      className = minting ? `${className} disabled` : className;
+      text = minting ? "Minting..." : "Mint";
+      action = askContractToMintNft;
+    }
+
+    return (
+      <button onClick={action} className={className}>
+        {text}
+      </button>
+    )
   };
 
   useEffect(() => {
@@ -191,20 +215,12 @@ const App = () => {
           <p className="sub-text">
             Each unique. Each beautiful. Discover your NFT today.
           </p>
-          {currentAccount === "" ? (
-            <button onClick={connectWallet} className="cta-button connect-wallet-button">
-      Connect to Wallet
-    </button>
-          ) : (
-            <button onClick={askContractToMintNft} className={`cta-button connect-wallet-button ${minting || wrongChain ? 'disabled' : ''}`}>
-                {minting ? "Minting..." : "Mint NFT"}
-              </button>
-          )}
+          {renderButton()}
           {!!mintingStats.current && (
             <>
-            <p className="minting-stats">{`${mintingStats.current}/${mintingStats.total} minted so far`}
-            </p>
-            <a href={OPENSEA_LINK} target="_blank">See collection on OpenSea</a>
+              <p className="minting-stats">{`${mintingStats.current}/${mintingStats.total} minted so far`}
+              </p>
+              <a href={OPENSEA_LINK} target="_blank">See collection on OpenSea</a>
             </>
           )}
         </div>
